@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<title>Iteration Object</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <link rel=stylesheet href="css/base.css"/>
+</head>
+<body>
+
+<script src="js/Three.js"></script>
+<script src="js/Detector.js"></script>
+<script src="js/Stats.js"></script>
+<script src="js/OrbitControls.js"></script>
+<script src="js/KeyboardState.js"></script>
+<script src="js/THREEx.KeyboardState.js"></script>
+<script src="js/THREEx.FullScreen.js"></script>
+<script src="js/THREEx.WindowResize.js"></script>
+
+<!-- jQuery code to display an information button and box when clicked. -->
+<script src="js/jquery-1.9.1.js"></script>
+<script src="js/jquery-ui.js"></script>
+<link rel=stylesheet href="css/jquery-ui.css" />
+<link rel=stylesheet href="css/info.css"/>
+<script src="js/info.js"></script>
+<!-- ------------------------------------------------------------ -->
+
+<div id="ThreeJS" style="z-index: 1; position: absolute; left:0px; top:0px"></div>
+<script>
+
+var container, scene, camera, renderer, controls, stats;
+var clock = new THREE.Clock();
+
+var keyboard = new THREEx.KeyboardState();
+
+var targetList = [];
+var projector, mouse = { x: 0, y: 0 };
+
+init();
+animate();
+
+// FUNCTIONS
+function init()
+{
+	// SCENE
+	scene = new THREE.Scene();
+	// CAMERA
+	var SCREEN_WIDTH = window.innerWidth, SCREEN_HEIGHT = window.innerHeight;
+	var VIEW_ANGLE = 45, ASPECT = SCREEN_WIDTH / SCREEN_HEIGHT, NEAR = 0.1, FAR = 20000;
+	camera = new THREE.PerspectiveCamera( VIEW_ANGLE, ASPECT, NEAR, FAR);
+	scene.add(camera);
+	camera.position.set(0,150,400);
+	camera.lookAt(scene.position);
+	// RENDERER
+	if ( Detector.webgl )
+		renderer = new THREE.WebGLRenderer( {antialias:true} );
+	else
+		renderer = new THREE.CanvasRenderer();
+	renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+	container = document.getElementById( 'ThreeJS' );
+	container.appendChild( renderer.domElement );
+	// EVENTS
+	THREEx.WindowResize(renderer, camera);
+	THREEx.FullScreen.bindKey({ charCode : 'm'.charCodeAt(0) });
+	// CONTROLS
+	controls = new THREE.OrbitControls( camera, renderer.domElement );
+	// STATS
+	stats = new Stats();
+	stats.domElement.style.position = 'absolute';
+	stats.domElement.style.bottom = '0px';
+	stats.domElement.style.zIndex = 100;
+	container.appendChild( stats.domElement );
+	// LIGHT
+	var light = new THREE.PointLight(0xffffff);
+	light.position.set(0,250,0);
+	scene.add(light);
+	// FLOOR
+	var floorTexture = new THREE.ImageUtils.loadTexture( 'images/checkerboard.jpg' );
+	floorTexture.wrapS = floorTexture.wrapT = THREE.RepeatWrapping; 
+	floorTexture.repeat.set( 10, 10 );
+	var floorMaterial = new THREE.MeshBasicMaterial( { map: floorTexture, side: THREE.DoubleSide } );
+	var floorGeometry = new THREE.PlaneGeometry(1000, 1000, 10, 10);
+	var floor = new THREE.Mesh(floorGeometry, floorMaterial);
+	floor.position.y = -0.5;
+	floor.rotation.x = Math.PI / 2;
+	scene.add(floor);
+	// SKYBOX/FOG
+	var skyBoxGeometry = new THREE.CubeGeometry( 10000, 10000, 10000 );
+	var skyBoxMaterial = new THREE.MeshBasicMaterial( { color: 0x9999ff, side: THREE.BackSide } );
+	var skyBox = new THREE.Mesh( skyBoxGeometry, skyBoxMaterial );
+	scene.add(skyBox);
+	
+	var faceColorMaterial = new THREE.MeshBasicMaterial(
+	{ color: 0xffffff, vertexColors: THREE.FaceColors } );
+
+	var sphereGeometry = new THREE.SphereGeometry( 80, 5, 3 );
+	for ( var i = 0; i < sphereGeometry.faces.length; i++ )
+	{
+		face = sphereGeometry.faces[ i ];
+		face.color.setRGB( 0, 0, 0.8 * Math.random() + 0.2 );
+	}
+	var sphere = new THREE.Mesh( sphereGeometry, faceColorMaterial );
+	sphere.position.set(0, 50, 0);
+	scene.add(sphere);
+
+	targetList.push(sphere);
+
+	projector = new THREE.Projector();
+
+	document.addEventListener( 'mousedown', onDocumentMouseDown, false );
+
+}
+
+function onDocumentMouseDown( event )
+{
+	console.log("Click.");
+
+	mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+	mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+	var vector = new THREE.Vector3( mouse.x, mouse.y, 1 );
+	projector.unprojectVector( vector, camera );
+	var ray = new THREE.Raycaster( camera.position, vector.sub( camera.position ).normalize() );
+
+	var intersects = ray.intersectObjects( targetList );
+
+	if ( intersects.length > 0 )
+	{
+		console.log("Hit @ " + toString( intersects[0].point ) );
+		intersects[ 0 ].face.color.setRGB( 1 * Math.random() + 0.7 * Math.random(), 3 * Math.random(), 1 * Math.random());
+		intersects[ 0 ].object.geometry.colorsNeedUpdate = true;
+	}
+
+}
+
+function toString(v) { return "[ " + v.x + ", " + v.y + ", " + v.z + " ]"; }
+
+function animate()
+{
+    requestAnimationFrame( animate );
+	render();
+	update();
+}
+
+function update()
+{
+	var moveDistance = 50 * clock.getDelta();
+
+	if (keyboard.pressed("right")) {
+        // Gira para a direita
+        targetList[0].rotation.y += 0.1; // Rotação em Y para a direita
+    }
+
+    if (keyboard.pressed("left")) {
+        // Volta a rotação para a esquerda
+        targetList[0].rotation.y -= 0.1; // Rotação em Y para a esquerda
+    }
+
+	if (keyboard.pressed("up")) {
+        // Movimenta para cima
+        targetList[0].position.y += 0.1; // Rotação em Y para a direita
+    }
+
+	if (keyboard.pressed("down")) {
+		// Movimenta para baixo
+        targetList[0].position.y -= 0.1; // Rotação em Y para a direita
+    }
+
+	// Usando a tecla → deve rotacionar para a direita
+	// Usando a tecla ← deve rotacionar para a esquerda.
+	// Usando a tecla ↑ deve movimentar o item para cima.
+	// Usando a tecla ↓ deve movimentar o item para baixo.
+
+    controls.update();
+    stats.update();
+}
+
+function render()
+{
+	renderer.render( scene, camera );
+}
+</script>
+</body>
+</html>
